@@ -1,0 +1,2173 @@
+/*	My English is very bad,so would have some error words or error statement in this note.	*/
+
+								
+							/*	AT&T_Linux_Assembly	*/
+
+Record parts split : 
+		
+		/---------------------------------------/
+		--					;
+		--	IA-32 CPU Enviornmention	;
+		--	System Mode			;
+		--	Cardinality And Complement Code	;
+		--	Assembly Language Translater	;
+		--	AT&T Assembly Basic Explanation	;
+		--	Instructions Set		:
+			--	Send Instructions Set	;
+			--	Math Operation		;
+			--	Bit Operation		;
+			--	Stack Operation		;
+			--	CPU Flags Change	;
+			--	String Operation	;
+			--	Jump And Cycle		;
+			--	Interrupt		;
+		--					;
+		--	Assembly Cunctions		;
+		--	Assembly Library		;
+		--	System Call			;
+		--	Inline Assembly			;
+		--	File Operation In Assembly	;
+		--					;
+	#	--	Optimization			;
+	#	--	Advance IA-32 Characteristic	;
+		--	Floating Operation		;
+		--					;
+	#	--	x86_64 Framework		;
+		--					;
+		/---------------------------------------/
+
+
+IA-32 CPU Enviornmention : 
+
+IA-32 : Intel Pentium CPU 32bit Framework (8086-16bit,80386-32bit).
+CPU primary parts : 
+	1>	Controload unit.
+	2>	Process unit.
+	3>	Registers.
+	4>	Flags.
+							<--->	Registers
+	Work method : 	Controload-unit <---> Process-unit
+							<--->	Flags
+
+	Controload-Unit Features : 
+		1>	Get instructions from memory.
+		2>	Decode instruction for process it.
+		3>	Get necessary data from memory (CPU save these data into registers).
+		4>	If necessity then save result.
+		
+		#	IA-32 CPU use the technology called 'NetBurst-Controload-Unit' to adjustment for process speed.
+		Features of NetBurst :
+			1>	Instruction read and decode in advance.
+				- Instructions prefetch>
+					Using pipeline to realizate prefetch,so must build cache memory in CPU.The speed of CPU access to cache-memory is 
+				faster than other memory.It is called L1-cache.But program is possable to do jump-operation,at the situation,CPU must clear
+				cache-memory before next prefetch.So introduce L2 cache-memory for adjustment process speed.L1 is independent with L2,if 
+				process do jump-operation,L1 clear and then read new instructions but L2 still save the old instructions.Afters new part have
+				finished,CPU read L2 to process instructions is older L1.
+					
+			2>	Branch prediction.
+				- Prediction technology>
+					1. Deeper prediction.(Allowed CPU to decode instructions across a lot of branch)
+					2. Dynamic data stream analyse.(Analysing stream with statistics)
+					3. Reasoning process.(Allowed CPU to confirms that whether the far instructions would be processing,and try to 
+					treatme	nt them )
+
+			3>	No order to process.
+				- None-order-processing-engine>
+					Analyse data from prefetch/decode pipeline and resort them.The engine could processing these instructions before
+				them would have to process.
+				- Parts>
+					1. Distributor.(Respone to buffer distribute,if the resources is too less,would be stopping instructions treatment 
+					and distribute resource to a other instruction it could be finished.)
+
+					2. Registers rename.(Distribute logic registers to treatment the instructions which must use register.)
+					3. Micro-operation dispatcher.(Send the micro-operation to Retire-unit,and at same time to keep synchronize.
+
+			4>	Retire.(Receives all micro-operation them had been sent by pipeline and adjustment order to normally order.
+
+	Process-Unit Features :
+		Built by a Arithmetic-Logic-Unit or  more than one.Them respones to some math operations.
+		Pentium 4 Independent ALU :
+				1. Simple integer operation.
+				2. Complex integer operation.
+				3. Float operation.
+
+	Registers : 
+		Classic : 
+
+			Normal registers	--	Eight for 32bit registers,use them to save data now processing.
+			Segment registers	--	Six for 16bit registers,use them to access to memory.
+			Instruction pointer	--	Unique 32bit register and it point to next instruction.
+			Float data registers	--	Eight for float registers all are 80bit.
+			Control			--	Five for 32bit registers to confirms CPU operation mode.
+			Debug			--	Eight for 32bit registers,used to save information in debug.
+
+		Normal Registers : 
+	
+			EAX	--	Accumulator for operand or result.
+			EBX	--	A pointer to point data in data-memory-segment.
+			ECX	--	Counter for string or cycle operation.
+			EDX	--	I/O pointer.
+			EDI	--	String operation destination pointer.
+			ESI	--	String operation source pointer.
+			ESP	--	Stack pointer.
+			EBP	--	Stack data pointer.
+
+			#	Register EAX,EBX,ECX,EDX could be splited to 16bit register or 8bit registers.
+			#	EAX--> AX(16bit),AH(Hight 8bit)/AL(Low 8bit);
+			#	EBX--> BX(16bit),BH(Hight 8bit)/BL(Low 8bit);
+			#	ECX--> CX(16bit),CH(Hight 8bit)/CL(Low 8bit);
+			#	EDX--> DX(16bit),DH(Hight 8bit)/DL(Low 8bit);
+
+		Segment registers : 
+
+			Memory mode : 
+				1> Flat memory mode.(All system memory as a continuous address space [linear address] )
+				2> Segments memory mode.(Divide memory to some indenpendent memory section,use segment registers to cite them)
+
+					CS	--	Code section.
+					DS	--	Data section.
+					SS	--	Stack section.
+					ES	--	Additional section pointer.
+					FS	--	Additional section pointer.
+					GS	--	Additional section pointer.
+
+				#	All segment registers are 16bit,save the start address of the specify section.
+
+				3> Realy address memory mode.(All segment registers point to zero-linear-address,and could not changed by program)
+
+		Instruction pointer register : 
+		
+			EIP,Instruction pointer.It was called 'Program Counter' in the sometimes.It point to next instruction which would be processing.
+		You can not change it directly,you may to use some instructions to change it.
+			In 'Flat memory mode' it point to linear-address,in 'Segment memory mode' it point to logic-address and ust 'CS' to access memory.
+
+		Controload registers :
+		
+			CR0	--	Controload operation mode and system flags.
+			CR1	--	Not be usage yet.
+			CR2	--	Memory page error information.
+			CR3	--	Memory page menu information.
+			CR4	--	Flags to support CPU charcteristic and explain it.
+
+			#	Could not access to control registers directly,but could to send data in it to the normal registers.So program could check 
+			#	situation of CPU or processing work currently.
+
+	Flags : 
+		Classic : 
+		
+			Status flags.
+			Control flags.
+			System flags.
+
+		Status flags : 
+		
+			Indicate the results by math operation was CPU did.
+
+			Name	Pos	Description
+			|	|	|
+
+			CF	0	'Carry' or 'Borrow'
+					#	This flag will be setting when CPU done a math operation that is none symbol calculation.
+					#	If happened 'Carry' or 'Borrow' then set bit up with '1',otherwise set '0'.
+
+			PF	2	'Odd-Even check'
+					#	If 'PF' set to '1',that means the bits-'1' in result numbers is odd.
+					#	If 'PF' set to '0',that means the bits-'0' in result numbers is even.
+			
+			AF	4	'Auxiliary flag'
+					#	For BCD incode mode,if the third bit happened 'Carry' or 'Borrow' then it will be setting to '1'.
+
+			ZF	6	'Zero flag'
+					#	If result == 0,then it will be opened '1',else it is '0'.
+
+			SF	7	'Symbol flag'
+					#	The value of this is equal to the most highly bit of result.Use 'SF' could determined value is '+' or '-'.
+		
+			OF	11	'Overflow'
+					#	Used to signed math operation if plus value too large or minus value too little,this bit will be opening.
+
+		Control flags :
+				
+			In the current only defined a 'DF' flag.
+			#	If 'DF' == 1,string-instruction auto to decreasing memory-address arrive next position;
+			#	If 'DF' == 0,string-instruction auto to increasing memory-address for arrive next position;
+
+		System flags :
+
+			These flags for controload operations in on system-level,program must not try to change them.
+
+			Name	Pos	Description
+			|	|	|
+
+			TF	8	'Trap flag'
+					#	Switch ‘Stepover execution' on.
+			
+			IF	9	'Interrupt-on flag'
+					#	The interrupt was splited to two parts - 'Internal interrupt' and 'External interrupt'
+					#	Internal-interrupt is from CPU.
+					#	External-interrupt is from Hardware.
+					#	Them has been splited to two classic interrupt : 'Can shield' , 'Can not shield'
+					#	If 'IF' == 1,CPU would be handling the 'Can shield interrupt',else does not to respones it.
+	
+			IOPL	12,13	'I/O privilege-level flag'
+					#	Indicate to I/O level of parent processing program.'IOPL' must is less than or equal to the I/O address-space 
+					#	that is program wants to accessing,otherwise all accessing would be refusing.
+	
+			NT	14	'Nested task'
+					#	Indicate to the parent processing task whether linked to a task other as it.
+
+			RF	16	'Resume flag'
+					#	Controload CPU how to respones exceptions in debug-mode.
+		
+			VM	17	'Virtual 8086 flag'
+					#	Indicate to CPU is processing in vir-8086 mode,now,not is 'protect-mode' or 'realy-mode'.
+
+			AC	18	'Align checking flag'
+					#	Enable memory align-checking with AM-Bit in 'CR0' together.
+
+			VIF	19	'Virtual interrupt flag'
+					#	If CPU is working in virtual mode,feature of 'VIF' is as same as 'IF'.
+
+			VIP	20	'Virtual inerrupt hang-up'
+					#	When CPU is working in virtual mode,this flag indicate to a process had been hang-up.
+
+			ID	21	'Identification'
+					#	Identify the CPU whether support to 'CPUID' instructions.If CPU could to set this flag as '0' or '1',that is
+					#	means CPU could use 'CPUID' instruction.
+
+	IA-32 Advance Characteristic : 
+
+		1>	Floating-point-unit (FPU).
+		2>	Multimedia-extension (MMX).
+		3>	Streaming SIMD extension,SSE.
+		4>	Hyberthreading.
+
+		FPU :
+			This feature for deal with float data as faster to be designed.Start on 80486,80287,80387 CPU,advance calculation had been integrated
+		to Main-Processor,so that support these features need addend some registers and processing units.These elements as a piece called 'x87 Float-
+		-ing point unit'(FPU)
+
+			Registers :
+				
+				FPU-Reg				Description
+
+				Data-Register			Usage of float data processing 80bit-register total is eight.
+				
+				Status-Register			Report status of FPU 16bit register.
+	
+				Control-Register		Control for FPU precision 16bit register.
+
+				Mark-Register			Descripte to content in data-registers 16bit register.
+
+				FIP-Register			Point to next FPU instruction 48bit pointer.
+
+				FDP-Register			Point to data in memory 48bit pointer.
+
+				Operand-Register		Save the lastest FPU instruction which had been processed 11bit register.
+
+		MMX :
+
+			'Multimedia extension' was designed for support to 'Single Instruction,Multiple Data,SIMD'.
+
+			MMX enviornment have three new data type of integer : 
+
+				64bit packing byte integer.
+				64bit packing word integer.
+				64bit packing double-words integer.
+
+		SSE : 
+
+			Power up floating performance of  '3DGraph' and 'Dynamic video' and 'Video task'.
+			Pentium3 CPU had been introduced new 128bit registers total is eight (XMM0--XMM7),and a new data type of 'Single precision'.Not only
+		 these new features,and SSE had introduced new addend instructions as well.
+			Pentium4 (SSE2) introduced five new data type : 
+
+				128bit packing double-precision float data.
+				128bit packing byte integer.
+				128bit packing word integer.
+				128bit packing double-words integer.
+				128bit packing four-words integer.
+
+		Hyberthreading : 
+
+			This feature make IA-32 CPU could processing multi-processes at same time.Advantage would indicating on multi-task OS.
+
+
+	#	When you are programming assembly program,you should understand some informations of destination CPU.
+
+		---
+	---
+---
+
+##	System Mode :
+
+		Intel processor : 8080,8086/8088,80186,80286,80386,80486,Pentium,PentiumII,PentiumIII,Pentium4...
+
+		Realy-mode : 
+
+			Such as 8086/8088,them could not support to mulit-tasks-OS.
+			In this mode,address-space is as same as hardware memory number.Programs could access to physics address,and change data in it.
+		
+		Protect-mode : 
+			
+			Support to multi-tasks-work-method.All programs could only access to virtual address,exclusive of kernel.
+			For example,after 80386...(include 80386).
+
+		Virtual-8086-mode : 
+			
+			Switch work mode from 'protect mode' to '8086 work mode'.For example,the DOS-window of windowsOS.
+		---
+	---
+---
+
+##	Cardinality And Complement Code
+
+	Cardinality convertion :
+
+			Number - 128	
+
+			Dec:	128
+			Ocx:	0200
+			Hex:	0xF0
+
+			Binary:	10000000
+
+		For OCX,'0' is prefix;for HEX,'0x' is prefix.
+		Three binary bits convert to a OCX bit,four binary bits convert to a HEX bit.
+		
+		Value scope : 
+
+		Dec: 0---9
+		Ocx: 0---7
+		Hex: 0---F (10-A,11-B,12-C,13-D,14-E,15-F)
+		Bin: 0---1
+
+		Numbering for binary bits,right to left : '7,6,5,4,3,2,1,0'.
+		Binary transinformation to Dec: (Such as 128)
+			128=0*2^0 + 0*2^1 + 0*2^2 + 0*2^3 + 0*2^4 + 0*2^5 + 0*2^6 + 1*2^7
+
+	Complement code : 
+
+		For normaly situation use '1 complement-code'.Use the highest bit to indicate '+' or '-'.0--'+',1--'-'.
+		Flip all binary bits and then adding '1' to get a 'Negative number' of the value.
+		E.g.
+			+128 - 10000000	(Positive)
+			-128 - 
+				A:	01111111 (~+128)
+				B:	01111111+1
+				C:	10000000 (Negative)
+
+			+83 - 01010011 (Positive)
+			-83 -
+				A:	10101100 (~+83)
+				B:	10101100+1
+				C:	10101101 (Negative)
+
+		---
+	---
+---
+
+Assembly Language Translater :
+
+		For another platform have some another assembly translaters.
+
+		Windows : 
+			MASM (Microsoft Assembler)	--	Intel syntax assembly.
+
+		Linux :
+			GAS (GNU Assembler)		--	AT&T syntax assembly.
+			#	This program as a background assembler for GCC to be designed.
+	
+		Windows/Linux :
+			NASM （Newwide Assembler,NASM)	--	Intel syntax or AT&T syntax.
+	
+			HLA (High Levle Assembler,HLA)	--	Intel syntax.
+
+		Linker :
+			
+			On the linux,could use 'ld' to make execution file.
+	
+		Debuger :
+			
+			On the linux,could use 'GNU/gdb' to debug program.
+			Use 'GNU/objdump' to checking bottom-floor instructions.
+			Use 'GNU/gprof' to analysing for program code.
+
+		---
+	---
+---
+
+AT&T Assembly basic explanation :
+
+		First : The building for program>
+
+		#	In the OS 'GNU/Linux',parts'distribution of program is like this : 
+
+			-----
+
+			Stack	--->	Stack section,ESP point to the top of this stack in program.(Because linux use page/vm to mapping for memory,so in 
+					SS a filedescription was saved in it.)
+			-----
+
+			Unmap	--->	When linux load a program will make it a illsion that it have a large memory space.But if program want to using for 
+					these memory,must call 'brt' to map physics for them.
+			-----
+			data	--->	'data' section is saving some value(variables) them has been initialized.
+			-----
+			bss	--->	'bss' section is saving some value(variables) use 'null' or '0' to initialize them.So it always used to as buffer.
+			-----
+			text	--->	'text' section is saving program code by binary type with read only.
+			-----
+
+		Second : The general assembly program with AT&T>
+
+		#
+			.section .data		#	Declare '.data' section.
+					...
+			.section .bss		#	Declare '.bss' section.
+					...
+			.section .text		#	Declare '.text' section.
+			.global _start		#	Declare that the symbol '_start' is a global symbol,it was needed by 'ld'.
+
+				_start:		#	The program startion.
+					...
+		#
+
+			These in over all are not instructions,them are Assembler-commands.These is additional inforamtions would be sent to translater.
+			
+			'.section' -> Define a section.
+			'.global' -> Define a global symbol.
+			'_start:' -> A symbol.'linker' will use this symbol to set up for execulation-file'start-pointer.
+
+			What is symbol?
+			Answer: 
+				Symbol is a lable,it is not instruction.If only be processed by translater,translater use it to mark a memory address.
+			So that means a symbol is a address mark or is a address.In program could use symbol to represent a address value.
+				The style of symbol : 
+					Use ' . || _ || [A-Z] || [a-z] || ? ' as head,use a ':' as end.':' means that the signal is a lable.
+				E.g. MSG: (This is a symbol).
+			#	Remember,symbol is a address.
+
+		#	
+			Commands of Assembler>
+				For anthoer assemblers them have some commands all as not same,the command is not a instruction,commands only be processed by
+			Assembler.Assembler use them to processing for some works.
+				'.section' and '.global' are commands.
+
+		Third : The AT&T assembly syntax>
+	
+		#	Parts : 
+				1> Optional instruction prefix.
+				2> Operation code(opcode).
+				3> Optional modifier.
+				4> Optional data element.
+
+			The basic layout : 
+				
+				| I-prefix | Opcode | Modifier(ModR/M) | SIB | Displacement | Data element |
+				
+			Size of them : 
+				I-prefix -- 0~4 Byte.
+				Opcode -- 1~3 Byte.
+				ModR -- 0~1 Byte.
+				SIB -- 0~1 Byte.
+				Displacement -- 0~4 Byte.
+				Data element -- 0~4 Byte.
+			
+			1> Opcode : 
+				In assembly the Opcode is only for needed,another Opcode have another feature.
+			2> I-prefix : 
+				The prefix features class : 
+					1.	Lock-prefix and Repeat-prefix.
+					#	Lock-prefix indicate to the instruction would lock up share memory zone.
+					#	Repeat-prefix always used to repeat instruction operation.
+			
+					2.	Section-override-prefix and Branch-prompt-prefix.
+					#	Section-override-prefix could cover to the instruction has been defined segment-register.
+					#	Branch-prompt-prefix try to provides the condition-jump-path-clue is possible.
+	
+					3.	Operand-Length-Cover-Prefix.
+					#	Notice to processor that program would be switching this Opcode between in 16bit and 32bit.
+
+					4.	Address-Length-Cover-Prefix.
+					#	Notice to processor that program would be switching address-type between in 16bit and 32bit.
+			3>ModR : 
+				Some Opcodes needs modifier for understant the registers and memory-position was involed by this usage.
+			Modifier was contained in three for values indenpendy.
+
+			#	Modifier(ModR/M) -- Address accessing mode explanation.
+			#	SIB -- Scale-Index-Base_Address.
+			#	Address_Displacement -- one or two or four for address displacement Byte.
+
+				ModR/M> (Three fields)
+					Mod | Reg/Opcode | r/m
+	
+				ModR : 2Bits.It always using with 'r/m'.Them defined register or address-accessing-mode in the Opcode.In Opcode,possible 
+			address-accessing-mode have 24 kinds,adding the eight for registers,so all the values have 32 kinds probably.
+				
+				Reg/Opcode : 3Bits.Allowed to use the 3bits to defined Opcode feature or defined register-value further.
+
+				r/m : 3Bits.Defined the other one register for currented Opcode,or combining with the ModR field to defined a Opcode address-
+			-accessing-mode.
+
+				---
+		
+				SIB> (Three fields)
+					Scale | Index | Base_Address
+				
+				Scale : 2Bits.It is the scale_value of the specify Opcode.
+				Index : 3Bits.It specified to a register it would as the Index-Register.
+				Base_Address : 3Bits.It specified to a register it would as the Base_Address-Register.
+
+				---
+
+				Address_Displacement>
+					It as the index-value for the Memory-Address defined by ModR/M and SIB.Could use it as the Base_Memory_Address.
+
+				---
+
+			4>Data element : 
+				The Opcode'Operand.Some Opcode need a data-element as operation destination,so them could read data-element from registers or
+			from memory-position.This 'Value' could contain four for Bytes info.
+
+			##
+
+		#	Assembly use these bits build some 'Mnemonic' like these : 
+			
+			mov	$0x32,%EAX	//	Move(Send) 0x32 to register EAX.
+			push	%EAX		//	Push the element in EAX to stack.
+			pop	%EBX		//	Pop the top element in stack to EAX.
+			iaddl	$-20,%EAX	//	Signed adding,EAX=%EAX+(-20);this Opcode'operand length is double-words(l,4B).
+			sub	$2,%EAX		//	None signed division,EAX=%EAX-2;this Opcode'operand leght would be auto to matching by translater.
+			
+		---
+
+		Fourth : The data types defined by GNU-Assembler>
+
+			Commands			Type
+
+			.ascii				text string
+			.asciz				text string use a '\0' as end
+			.byte				a value length is one byte
+			.double				double precision floating data
+			.float				single precision floating data
+			.int				32bit integer
+			.long				32bit integer
+			.octa				sixteen bytes integer
+			.quad				quad bytes integer
+			.short				16bit integer
+			.single				single precision floating data
+
+		# Remember : 
+			These types all were defined by assembler,but in memory,them only is some memory unit(1B/Unit).
+		For the '.int',assembler would open a 4Bytes space up,that is the four for memory units and them are continuous.All types only is some memory
+		units,and 'one unit have 8bit length'!The memory units all are save some binary datas.You could understand to the type like that open some 
+		memory space up.
+
+			For example : 
+			
+				MSG:
+					.ascii "Hello World"
+			##
+				'MSG:' -- It is a symbol which is a memory address.
+				'.ascii' -- Data type 'text string'.
+				"..." -- GAS interprets the context in '"' as a ASCII string.
+
+			Static value symbol : 
+			
+				Command : '.equ'
+	
+				For example : .equ Name,Value
+
+				#	Name is a symbol,Value is the const value.Then you could cite it in '.text' with a '$'.
+				#	Like this : $Name
+
+		# bss section data type : 
+
+			Commands	Description
+
+			.comm		Declare normaly memory zone for uninitialized-data.
+			.lcomm		Declare locale normaly memory zone for uninitialized-data.
+
+			Syntax : 
+				.comm(.lcomm) symbol,length
+
+			.comm type could be accessing by others external programs.
+			.lcomm type could not be accessing by others external programs.
+
+			The space size is length would be fulled by translater with '0'.
+
+		---
+
+		Fiveth : Data and Address accessing and Registers cite>
+
+			Immediate number : 
+					'ImmN' always would as the Immediate number used in the instrcutions.
+			'11','0x11','012','0B00001111' and more all are 'Immediate numbers',in AT&T,if you want use a ImmN in a instruction,must to adding a 
+		prefix '$'.Like this : $0x12,$12,$033,$0B10010011 ...
+
+			Address accessing : 
+					Address accessing is that use a memory address unit in a instruction to I/O data.
+				AT&T use 'indexed memory mode' to accessing for memory address unit.
+			
+				# Indexed memory mode >
+					The memory address have be determinded by these items : 
+					
+					#	Base_Address
+					#	The displacement of Base_Address
+					#	Data element length
+					#	Index_Address to Determinding for the element
+
+				The general expression style : section:displacement(Base,Index.Scale)
+				But Linux working on the Protect method,exclution for kernel programs all applications could only seen logic linear address.
+			So could not use the segment registers in that expression.
+				The calculation method : 
+						The-real-address=Section_Reg*16+Base_Addres+Index*Scale+Displacement ;
+					
+				Because the protect working mode,so use Base_Address,Index_Address,Scale,Displacement to accessing address.
+
+			Base_Address and Index_Address could is anyregister which is 32bit.
+			Scale could is the value 1,2,4,8.
+			Displacement is the Dec'Positive or Negative number.
+			And the Base_Addres and Index_Addres could only use ones of them,but at that situation,you must use ',' as 'Placeholder' yet.The 
+		Scale default is '1'.
+
+			According for the narration,the general usage like these : 
+
+				#	12(%EBX,%ESI,0x1)
+				#	(%EBX,%ESI,0x1)
+				#	(,%ESI,0x1)
+				#	-3(,%ESI,)
+			
+			#	Null parts value is 0,exclution 'Scale'
+
+			Absolute addressing : 
+					
+					M[Imm]		-->		movq	0x600639,%EAX
+
+			Registers cite>
+
+				In AT&T assembly language,cite a Register must adding a prefix '%' in the front of Register-Name.
+				#	Like this : 
+						%EAX,%EBX,%SS,%CS,%ES...
+
+				#	%Reg -> Get data from Reg which would as operand.
+				#	(%Reg) -> Get data from Reg which would as an address to be accessing.
+
+				#	Case insenstive!
+
+			
+		---
+	
+		Sixth : The CPUID instruction>
+
+			CPUID is a assembly instruction,use this instruction could requesting for processor information from CPU.CPUID use EAX register as 
+		the input register.Send another value to EAX to get another infos.
+
+			EAX-Value			CPUID-Output
+
+			0				Vendor-ID-string and the maxinum CPUID selction
+			1				Processor type,serise,model,single-split-info
+			2				Processor cache completing info
+			3				Processor sequence number
+			4				Cache completing(threads number,kernels number,physics attributes)
+			5				Surveillance information
+			0x80000000			Extended Vendor-ID-string and the supported level
+			0x80000001			Extended processor type,serise,model,single-split-info
+			0x80000002--0x80000004		Extended the name string or processor
+
+			For example : 
+				#	Send 0x0 to EAX and then execute 'CPUID'.The data from returned by CPU.
+				
+				EBX :		The lowest 4 Bytes.
+				ECX :		The midly 4 Bytes.
+				EDX :		The highest 4 Bytes.
+
+		---
+	---
+---
+
+Instructions Set :
+
+	#	Send instructions set>
+
+		MOVX	->	movX	source,destination
+
+		#	Send data from source to destination.
+		#	source and destination could is 'Memory-address' or 'Data in the memory' or 'Immediate number' or 'Registers'.
+
+		Combinations : 
+			
+			movX	Imm,Reg
+			movX	Imm,Mem
+			movX	Reg,Reg
+			movX	Reg,Section-Reg		//	Section_Register could not be changed by Immediate number.
+			movX	Section-Reg,Reg
+			movX	Reg,EFLAGS
+			movX	EFLAGS,Reg
+			movX	Reg,Debug-Reg
+			movX	Debug-Reg,Reg
+			movX	Mem,Reg
+			movX	Mem,Section-Reg	
+			movX	Reg,Mem
+			movX	Section-Reg,Mem
+
+		#	‘X’ is a suffix,it could is 'b(Byte)','w(Word)','l(Double-Words)','q(Quad)'.
+
+		For example :	movw	$0xFF89,%AX	//	Send 16bit Hex-Value 0xFF89 to AX
+
+		###	Data switching instructions>
+
+
+		XCHG	->	xchg	operand1,operand2	//	Switching data between two registers or two memory address.
+		BSWAP	->	bswap	operand			//	Reverse Byte-Order of a Register.
+								//	0--7 <-> 24--31 ; 8--15 <-> 16--23 ;
+		XADD	->	xadd	source,destination	//	Switching data between two registers or two memory address,then adding for them save
+								//	result in the destination.
+	---
+
+	#	Condition to move : 
+
+		Instructions			Description			EFLAGS state
+
+		#	None signed
+
+		CMOVA/CMOVNBE			Above/Not-less or Equal		CF=0/ZF=0
+		CMOVAE/CMOVNB			Above or Equal/Not-less		CF=0
+		CMOVNC				Have not 'Carry'		CF=0
+		CMOVB/CMOVNAE			Less/Not-greater or Equal	CF=1
+		CMOVC				Had 'Carry'			CF=1
+		CMOVBE/CMOVNA			Less or Equal/Not-greater	CF=1/ZF=1
+		CMOVE/COMVZ			Equal/Zero			ZF=1
+		CMOVNE/CMOVNZ			Not-equal/Not-zero		ZF=0
+		CMOVP/CMOVPE			Even-Checking			PF=1
+		CMOVNP/CMOVPO			Odd-Checking			PF=0
+
+		#	Signed
+
+		CMOVGE/CMOVNL			Above or Equal/Not-less		(SF xor OF)=0
+		CMOVL/CMOVNGE			Less/Not-greater or Equal	(SF xor OF)=1
+		CMOVLE/CMOVNG			Less or Equal/Not-greater	(SF xor OF)=1/ZF=1
+		CMOVO				Overflow			OF=1
+		CMOVNO				Have not overflow		OF=0
+		CMOVS				Negative			SF=1
+		CMOVNS				Positive			SF=0
+
+		#	In the background,use 'destination'-'source' but do not change real data,only change the EFLAGS bits.
+
+	---
+
+	#	Math operation
+
+		###	Addition
+
+		IaddX	source,destination
+
+		#	source could is ImmN,MemAddr-Data,Reg.
+		#	destination could is MemAddr-Data,Reg.
+		#	But could not use MemAddr as source and destination at the same time.
+		#	Add result would be saved in 'destination'.
+		#	'X' could is 'b','w','l','q'(In 64bit model).
+		#	'I' could is 'i(Signed)',or is null.
+
+		!	Becareful,'add' would change EFLAGS register.'CF' is 'carry or borrow','OF' is 'overflow'.
+
+		IadcX	source,destination
+
+		#	adcX could processing the values are greater than addX's.Because adcX will use CF-bit to do adding calculate.
+		#	source could is 8bit,16bit,32bit Register or MemAddr-Data.
+		#	destination could is 8bit,16bit,32bit,Register or MemAddr-Data.
+		#	But could not use MemAddr as source and destination at the same time.
+		#	'X' could is 'b','w','l','q'.
+		#	'I' could is 'i(Signed)',or is null.
+
+			For example to adding two 32bit values : 
+				
+					#	The value1
+					movw	$0xFFFF,%AX	//	High 16bit
+					movw	$0xE0BC,%BX	//	Low 16bit
+					
+					#	The value2
+					movw	$0x3012,%CX	//	High 16bit
+					movw	$0x1003,%DX	//	Low 16bit
+
+					addw	%BX,%DX		//	Low 16bit + Low 16bit		CF=1.
+					adcw	%AX,%CX		//	High 16bit + High 16bit
+
+					Result = CX(Hight 16bit),DX(Low 16bit)
+
+		##	Subtraction
+
+		IsubX	source,destination
+
+		#	source could is 8bit,16bit,32bit,Register or MemAddr-Data.
+		#	desitination could is 8bit,16bit,32bit,Register or MemAddr-Data.
+		#	Subtraction result would be saved in destination.
+		#	'X' could is 'b','w','l','q'.
+		#	'I' could is 'i(Signed)'.
+
+		!	Becareful,'add' would change EFLAGS register.'CF' is 'carry or borrow','OF' is 'overflow'.	
+
+		IsbbX	source,destination
+
+		#	This instruction like as IadcX.It will use info from 'CF' bit to do subtract.(Borrow).
+
+			For example to subtract two 32bit values : 
+
+					#	The value1
+					movw	$0xABBF,%AX	//	High 16bit
+					movw	$0x1002,%BX	//	Low 16bit
+			
+					#	The value2
+					movw	$0x08F2,%CX	//	High 16bit
+					movw	$0xF101,%DX	//	Low 16bit
+
+					subw	%DX,%BX		//	Low 16bit - Low 16bit.This will set CF on.
+					sbbw	%CX,%AX		//	High 16bit - High 16bit.This will use the CF bit.
+
+					Result=AX(High 16bit),BX(Low 16bit)
+
+		##	Increasing and Decreasing
+
+		IincX	operand		//	operand++
+
+		IdecX	operand		//	operand--
+
+		#	These instructions often be using to None-Signed value.If you use them at Signed value,becareful the symbol'changing.
+		#	operand could is 8bit,16bit,32bit,Register or MemAddr-Data.
+		#	'I' could is 'i(Signed)' or null.
+		#	'X' could is 'b','w','l','q'.
+
+		
+		##	Multiplition and division
+
+		ImulX	source
+
+		#	source could is 8bit,16bit,32bit,Register or MemAddr-Data.
+		#	The implication value default saved in AL(8bit-mul).
+
+		#	If source == 8bit,the first value in AL;if source == 16bit,the first value in AX;if source == 32bit,the first value in DX--AX(H-L).
+		#	So,source and implication-value in multiplition must as same length.
+
+		#	The result:
+				8bit-mul	-->	AX
+				16bit-mul	-->	DX(high 16bit),AX(low 16bit)
+				32bit-mul	-->	EDX(high 32bit),EAX(low 16bit)
+
+		#	'I' could is 'i(Signed)' or null.
+		#	'X' could is 'b','w','l','q'.
+
+			###	For signed multiplition.
+
+			imul	source				//	As same as None signed multiplition.
+			imul	source,destination		//	destination=source*destination
+			imul	multiplier,source,destination	//	destination=source*multiplier(Immediate-Number)
+
+			Becareful,you must prevent calculation overflow when you doing calculate.
+
+
+		IdivX	source
+
+		#	source could is 8bit,16bit,32bit,Register or MemAddr-Data.
+		#	The implication divided value default saved in AX(8bit-div).
+
+		#	If source == 8bit,divided-value must is 16bit in AX;if source == 16bit,divided-value must is 32bit in DX-AX(H-L);if source == 32bit,
+		#	divided-value must is 64bit in EDX--EAX(H-L).
+
+		#	The result:
+				8bit-div	-->	AX(AL--Quotient_Value,AH--Remain_Value)
+				16bit-div	-->	DX--AX(AX--Quotient_Value,DX--Remain_Value)
+				32bit-div	-->	EDX--EAX(EAX--Quotient_Value,EDX--Remain_Value)
+
+		#	'I' could is 'i(Signed)' or null.
+		#	'X' could is 'b','w','l','q'.
+
+			###	For signed division.
+
+			idiv	source
+	
+			#	source could is 8bit,16bit,32bit,Register or MemAddr-Data.
+			#	Other syntax as same as none-signed division.
+
+	---
+	
+	#	Bit operation
+
+		##	Bit Move
+
+		shlX		To left logic move bit.
+		salX		To left calculation move bit.
+	
+		shrX		To right logic move bit.
+		sarX		To right calculation move bit.
+
+		Syntax :
+			
+			shl	destination		-->	The bits in destination move to left with 1bit.
+			shl	%CL,destination		-->	The bits in destination move to left with the bit-number in CL.
+			shl	shifter,destination	-->	The bits in destination move to left with the bit-number is equal to shifter.
+
+			#	destination could is 8bit,16bit,32bit,Register or MemAddr-Data.
+			#	'X' is the length of destination.
+
+			#	The bit had been moved to outside will be saving in 'CF' temporarily(Next bit will cover it).	--	shlX/salX
+			#	The new null bit will be fulling by '0'.	--	shlX/salX
+
+			The syntax of shrX and sarX as same as shlX and salX.
+		
+			#	But for signed value,move bit will cause some problems.
+			#	If destination is a none-signed value,that is don't worry,but if it is a signed value,the highest bit is the symbol of 
+			#	positive or negative.So,SHRX will clear the null bits in left,and SARX will full older symbol-bit to the highest bit.
+
+		##	Cycle to move bit
+
+		ROLX		To left move bit by cycle.
+		RORX		To right move bit by cycle.
+		RCLX		To left move bit by cycle with 'Carry-flag' together.
+		RCRX		To right move bit by cycle with 'Carry-flag' together.
+
+		The cycle move bit instructions,in the general as same as SHLX/SHRX/SALX/SARX.But them would not drop the overflow-bit,them will be placing 
+	the overflow-bit to the other place.(Left to Right,Right to Left).
+
+		Syntax : 
+			
+			rolX	source			-->	Move 1bit to left.
+			rolX	%CL,source		-->	Move ?bits to left.(? is counter in CL-Reg).
+			rolX	shifter,source		-->	Move shifter-bits to left.(shifter is a immediate-value).
+
+	---
+
+	#	Logic operation :
+
+			Instructions		(The C programming Language logic operators)
+
+			AND		-->	&
+			NOT		-->	~
+			OR		-->	|
+			XOR		-->	^
+
+			Syntax : 
+
+				AND	source,destination	//	destination&=source
+				#	OR and XOR's syntax as same as AND's.
+
+				'source' could is 8bit,16bit,32bit immediated value or register or memory unit.
+				'destination' could is 8bit,16bit,32bit register or memory unit.
+				#	But can not use memory units at same time.
+
+				NOT	operand			//	operand~=operand
+
+			##
+
+			TEST	source,destination		//	destination&source,and then change some EFLAGS bits.
+
+			#	Not write any data to destination,only use source to testing with the destination.
+
+	---
+
+	#	Stack : 
+
+			Stack is the temporary memory space for program.Program could use some Stack-Instructions to accessing the Stack.CPU use SS Register
+		as the Stack-Segment-Register,use ESP/SP as the TOP-Element pointer in the stack.But in linux,the protect working mode could not change Stack
+		memory section with manual setting.Because when a program has been starting up,System will auto to distribute some memory space for this 
+		process.By the time,SS Register only saved a description of resource.If you changed SS,then Stack-Instruction will accessing other memory 
+		space these is not own to currently process,so System will send process with a SIGSEGV(Segmention failed).
+
+			Instructions	
+
+			pushX	source		//	Push a element from the source into stack.
+
+			popX	source		//	Pop a element from stack into the source.
+
+			source could is :
+						16bit,32bit Register
+						16bit,32bit MemAddr-Data
+						16bit Segment Register
+						8bit,16bit,32bit Immediate Value
+
+			'X' could is :
+					'w','l',q'
+
+			#	The Minimun length of source for Stack-Instructions is 16bit(A word).
+			#	And the 'w','l' suffix may be used in 32bit-model only.(Use '.code32' command to notice translater use 32bit-model)
+
+			
+			pusha		-->	Push all 16bit normaly registers to stack
+			popa		-->	Pop all 16bit normaly registers from stack
+
+			pushad		-->	Push all 32bit normaly registers to stack
+			popad		-->	Pop all 32bit normaly registers from stack
+
+			pushf		-->	Push the lower 16bit from EFLAGS-Reg to stack
+			popf		-->	Pop the lower 16bit from stack to EFLAGS-Reg
+		
+			pushfd		-->	Push the 32bit EFLAGS-Reg to stack
+			popfd		-->	Pop the 32bit EFLAGS-Reg from stack
+
+
+			Effective to memory accessing the principles by Intel : 
+
+				1>	As 16Bytes boundary to adjustment for 16bit data.
+				2>	Adjustment 32bit data make its base_address is the multiplement of 4.
+				3>	Adjustment 64bit data make its base_address is the multiplement of 8.
+				4>	Prevent to use a lot of little data for sending,use the only a large data for sending.
+				5>	Prevent to use longer data in the Stack.
+
+	---
+
+	#	CPU flags change>
+
+			Before the changing-instructions,description for the FLAGS again.
+	
+			ZF	6th bit		Record operation result.result==0,ZF=1;result!=0,ZF=0.
+			PF	2sd bit		Record operation result.If '1'bit the numbers all is a even number,PF=1;otherwise,PF=0.
+			SF	7th bit		Record operation result.If result<0,SF=1;if result>=0,SF=0.
+			CF	0th bit		Record operation result.If happend 'Carry' or 'Borrow',CF=1;otherwise CF=0.
+			OF	11th bit	Record operation result.If the result had oveflow,OF=1;had not overflow,OF=0.
+			DF	10th bit	Direction flag.In the string-processing,if DF=0,ESI and EDI increasing;if DF=1,ESI and EDI decreasing.
+			TF	8th bit		Single processing flag.
+			IF	9th bit		Receive none shield interrupt behavior flag.
+
+
+			Instructions
+
+			STD	-->	Set up DF=1.
+			CLD	-->	Set down DF=0.
+		
+			STI	-->	Set up IF=1.
+			CLI	-->	Set down IF=0.
+
+			STC	-->	Set up CF=1.
+			CLC	-->	Set down CF=0.
+			CMC	-->	CF~=CF.
+
+			
+			#	For other flags,could use 'pushf' push flags to stack,and then use 'and || or || xor' to change them,
+			# after use 'popf' to rewrite flags.	! But some flags can not be changed by application.
+
+	---
+
+	#	String operations> 
+
+		#	Send strings
+
+			Instructions
+
+			movsb		-->	Send a byte data.
+		
+			movsw		-->	Send a word data.
+
+			movsl		-->	Send a double-words data.
+
+			movsq		-->	Send a quad data.
+
+			
+		#	These instructions use 'ESI-Reg' as 'source',use 'EDI-Reg' as 'destination'.Like this : 
+
+			movl	$Temp1,%ESI		#	The temp memory address.
+			movl	$Temp2,%EDI		#	The temp memory address
+
+			cld				#	Set DF=0.
+
+			movw	$0x0A,%CX		#	Repeat counter.
+
+			rep movsb			#	Repeat to send a Byte from ESI to EDI.The repeat counter is the number in ECX,and finished 
+							#	once sending,ESI++,EDI++.(DF=0).
+
+		#	'rep' is a prefix,it could change the behavior of the 'movsX' instruction.
+		#	Other has these : 
+
+			REPE		-->	Repeating when equaled.
+			REPNE		-->	Repeating when did not equal.
+			REPNZ		-->	Repeating when did not equal zero.	(ZF=0)
+			REPZ		-->	Repeating when equaled to zero.		(ZF=1)
+	
+		---
+		
+		#	Save and load strings
+
+			Instructions
+
+			lodsb		-->	Load a Byte data to AL.
+
+			lodsw		-->	Load a Word data to AX.
+
+			lodsl		-->	Load a Double-Word data to EAX.
+
+			#	They use 'ESI' as implicated source,the ESI Registers must have been saved an address of the source string.
+			#	DF=0,ESI++;DF=1,ESI--.
+
+			Instructions
+
+			stosb		-->	Save a Byte data from AL.
+
+			stosw		-->	Save a Word data from AX.
+		
+			stosl		-->	Save a Double-Words from EAX.
+
+			#	They use 'EDI' as implicated destination,the EDI Registers must have been saved an address of the destination.
+			#	DF=0,EDI++;DF=1,EDI--.
+
+		---
+
+		#	Compare strings
+
+			Instructions
+
+			cmpsb		-->	Compare to a Byte data.
+
+			cmpsw		-->	Compare to a Word data.
+
+			cmpsl		-->	Compare to a Double-Words data.
+
+			#	They as same as other string-instructions use 'ESI' and 'EDI' as the 'source' and the 'destination'.
+			#	DF=0,ESI++,EDI++;DF=1,ESI--,EDI--.
+
+			#	In the background,'cmp' use 'destination'-'source' and then only change EFLAGS-bits.
+			#	And you could use 'rep' prefix in the 'Compare string instructions'.Use 'REPE','REPNE','REPNZ','REPZ'.Do not use 'rep',
+			# beacuse the 'rep' prefix only check counter value in the ECX.
+
+		---
+
+		#	Scanf strings
+
+			Instructions 
+
+			scasb		-->	Comparing for a Byte data with another data in AL.
+			
+			scasw		-->	Comparing for a Word data with another data in AX.
+			
+			scasl		-->	Comparing for a Double-Words data with another data in EAX.
+
+			#	Use 'EDI' as the implicated 'destination'.DF=0,EDI++;DF=1,EDI--.
+			#	While comparing the trings also to set up some bits in the EFLAGS.
+			#	They could using with 'REPE' and 'REPNE' or others.
+
+			#	REPE	:	Checking the string,find the character which is not match to it(In AL/AX/EAX).
+			#	REPNE	:	Checking the string,find the character which is match to it(In AL/AX/EAX).		
+
+		---
+
+	---
+
+	#	Jump and Cycle>	
+
+			Before use Jump-Instructions,must understand that How CPU to processing instructions?
+			CPU have 'CS'-Segment-Register and 'RIP(64) || EIP(32) || IP(16)'-Instruction-Pointer-Register.
+
+			The 'CS' saved segment address,that is the '.text' section address.The command '.global' declare '_start' symbol as a global symbol.
+		And then linker use this symbol to mark start pointer of the ELF file.System load this program,by the time,must initialize some registers at
+		before.So 'CS' will be setting up as the address of '.text',and 'IP' will be setting up as '0'.CPU use CS:IP to determind next instruction.
+		'IP' saved the next instruction'off_set.CPU at first read instruction to a parts which was called 'Instructions buffer',after that 'IP' will
+		increasing the number is equal to the last instruction.At the least,'processing parts' processing the instruction.
+
+			'CS'	--	0x332202
+			'IP'	--	0x0
+					0x3
+					0x5
+					0x8
+					0xA
+
+			So,'IP' always point to next instruction.
+			
+			The JUMP-Instructions could change 'CS' or 'IP' to jump the code-place where you want to jump.
+
+			Jump was splited for three kinds :
+
+				1> Shortly Jump
+
+				2> Nearly Jump
+
+				3> Farly Jump
+
+		Shortly Jump'jump-scope is -127~~+128 (Scope of the 'IP' could be changed).
+		Nearly Jump'jump-scope is -32768~~+32767 (Scope of the 'IP' could be changed).
+		Farly Jump often used to jump to other section.
+
+		#	None condition jump :
+
+			Instructions 
+
+			jmp	location
+
+			call	location
+
+			ret
+
+			int	Int_Num		//	This is an interrupt instruction.
+
+			into	Int_Num		//	This is an intertupt instruction.
+
+			
+			#	jmp	location
+
+				On Intel-Assembly,jmp has the syntax : 
+
+					jmp short location
+					jmp near ptr location
+					jmp far ptr location
+
+				But in AT&T-Assembly,use prefix to change the behaviro : 
+
+					jmp	Location	#	Shortly jump
+					ljmp	Section,Offset	#	Long jump
+
+				In the general,Location could is a 'Symbol','Address 0x0000..',or a 32bit Normaly Register.Like this : 
+					
+					jmp	Temp1	#	Directly jump,Temp1 is a Symbol.
+					jmp	0x2211	#	Directly jump,0x2211 is a Relative location.
+					jmp	*0x3232	#	Indirectly jump,must adding a '*' in the front.
+					jmp	*%EBX	#	Indirectly jump,jump to the location address was saved in EBX.
+					jmp	*(%EBX)	#	Indirectly jump,jump to the location address was saved in a Memory-Unit.
+
+				#	Use absolute jump(Indirectly Jump),must have a '*' in the front of address.
+
+				#	%EBX,cite the data in EBX.
+				#	(%EBX),cite the data in a Memory-Unit.
+
+					ljmp	%CS,0x33	#	The section long jump.
+					ljmp	%DS,0x11	#	Section long jump.
+					ljmp	*0x1313		#	Indirectly long jump.
+
+					//	These syntax may be are error instructions,because I have not found long-jump-syntax in the book.
+
+				//	The directly jump,will calculate offset.
+				//	The indirectly jump,will use an absolute address.
+
+			#	call	location	And	ret
+
+				'call' instruction often used to call a function.In Assembly,function also is some binary codes in the memory.So could use 
+			'call' jump to the 'function' header and processing the function work.At the end of 'Function',process would not auto to return to 
+			the 'caller',must use 'ret' instruction initiative to return.
+				Like this :
+
+					call	_Division_	#	_Division_ is a symbol
+
+						...
+
+				.type _Division_,@function	#	Notice to assembler that this symbol is a function address.
+				_Division_:			#	The function symbol
+
+					....			#	Function feature.
+
+					ret			#	Initiative return.
+
+					'call' do thest work:	(Use assembly language to descripting Assembly-Instruction).
+
+						push	IP		#1,In 64bit linux,will push RIP(8B).
+						jmp	Function	#2
+
+					'ret' do thest work:
+
+						pop	IP		#	After IP restore,CPU will processing the next Instruction CS:IP.
+
+						# In 64bit linux,will pop RIP(8B).
+
+				#	And also have long call instruction and long ret instruction.
+				
+					'lcall' like the 'ljmp'
+
+					long ret is 'lret.
+
+			---
+
+		#	Condition jump : 
+
+				The condition jump instructions all are as same as the jmp instruction,but they would check the EFLAGS before jump.And the 
+			condition jump only allows 'Shortly jump' and 'Nearly jump'.
+
+			At first,the 'CMP' instruction.
+
+				CMP	operand1,operand2
+
+			'CMP' instruction compare the two for operands.In the background,'cmp' do the work that 'operand2-operand1' but without change data.
+		The result will change the EFLAGS register,and then could use 'Condition Jump' to jump where.
+
+			
+			Table of condition jump instructions : 
+
+			Instructions			Description(Jump)		EFLAGS
+
+			JA				above				CF=0 and ZF=0
+			JAE				above or equal			CF=0
+			JB				below				CF=1
+			JBE				below or equal			CF=1 or ZF=1
+			JC				'Carry'				CF=1
+
+			JCXZ				CX==0
+			JECXZ				ECX==0
+
+			JE				equal				ZF=1
+			JG				greater				ZF=0 or SF=OF
+			JGE				greater or equal		SF=OF
+			JL				less				SF=1 or OF=1
+			JLE				less or equal			ZF=1 or SF=1 or OF=1
+			JNA				not greater			CF=1 or ZF=1
+			JNAE				not greater or equal		CF=1
+			JNB				not below			CF=0
+			JNBE				not below or equal		CF=0 or ZF=0
+			JNC				none 'Carry'			CF=0
+			JNE				not equal			ZF=0
+			JNG				not greater			ZF=1 or SF=1 or OF=1
+			JNGE				not greater or equal		SF=1 or OF=1
+			JNL				not less			SF=OF
+			JNLE				not less or equal		ZF=0 or SF=OF
+			JNO				none overflow			OF=0
+			JNP				none odd-even checking		PF=0
+			JNS				none signed			SF=0
+			JNZ				not zero			ZF=0
+			JO				overflowe			OF=1
+			JP				odd-even checking		PF=1
+			JPE				even '1'			PF=1
+			JPO				odd '1'				PF=0
+			JS				signed				SF=1
+			JZ				zero				ZF=1
+
+		---
+	
+			#	Cycle
+
+				loop	location
+	
+				#	loop	location
+
+			
+				loop is a shortly jump,and location always is a symbol.Like this :
+
+				loop Cycle
+
+				loop at the first do this work : CX-=1.
+				And then if (CX != 0) Jump to symbol,otherwise do not jump.
+
+				Others loop : 
+
+				LOOPE/LOOPZ			Until ECX==0 or have not seted ZF=1.
+				LOOPNE/LOOPNZ			Until ECX==0 or have seted ZF=1.
+
+		---
+
+	---
+
+	#	Interrupt>
+
+			Interrupt had been splited to two kinds.
+			1>	Can Shield Interrupt.
+			2>	Can not Shield Interrupt.
+
+			When CPU finished an instruction once,it would check if got a interrution.The interrupt could is from the internal of CPU,or could is
+		from the external of CPU(CMOS,Hardware).System maintain a ‘Interrupt-Vector-Table',the table records all interrupt-program' CS and IP.CPU use
+		the 'interrupt kind number' determine to call which interrupt-program.The 'Interrupt-kind-number' always contained in the Interrupt-Message.
+			Because the 'Interrupt-Vector-Table' was maintained by System,so must passing System to registration for Custom-Interrupt.
+			If IF flag opened,CPU could not to respones the 'Can Shield Interrupt'.But whether IF=1 or IF=0,the 'Can not Shield Interrupt' must 
+		be responed by CPU.In 8086CPU,the 'Can not Shield Interrupt' kind number is '2'.
+
+			The Interrupt works of CPU : (int)
+
+				1>	Get kind number
+				2>	pushf		(Save PSW)
+				3>	IF=0 (TF=0,as the situation to setting up)
+				4>	push	CS
+				5>	push	IP
+				6>	New CS and New Ip
+
+			The return from interrupt-program : (iret)
+
+				1>	pop	IP
+				2>	pop	CS
+				3>	popf
+
+			Instructions
+				
+				into	Number
+				int	Number		//	Initiativly make a interrupt,'Number' is the interrupt kind number.
+				iret			//	Return to the interrupted program from the interrupt-processing-program.
+
+			'int',initiativly make a interrupt,then CPU do the preparation works (All is 6).
+			'iret',return to the was interrupted program.
+
+		#	In linux,interrupt process is split for two parts.The up parts and the down parts.Up-parts must finished work as quickly as well,the
+		 Down-parts could left and waiting for schedule.And interrput could be interrupted by other one interruption,interruption level spliting.
+
+		---
+	---
+---
+
+Assembly Function : 
+
+		Assembly Function have three for steps : 
+			1>	Define input parameters.
+			2>	Define operation for parameters.
+			3>	Define how make the result and how return the result from caller.
+
+		1>	Have three technologies : 
+			
+			#	Use registers.
+			#	Use global variables.
+			#	Use Stack.
+
+		2>	Define operation : 
+		
+			GAS could use commadn '.type' to define a type symbol.
+			Use 
+				.type Symbol,@function
+				Symbol:
+					....
+
+			Could define a function.
+
+		3>	Return result : 
+			
+			#	Save it in the registers.
+			#	Save it in a global variable.
+
+		
+		When you defining a function,must make some constraint.
+		The constraint could contain these : 
+
+				#	The arguments how to send to function.If use Stack,what is the order of pushing?
+				#	The result how to return to caller.
+				#	Function whether using some registers.
+
+			So could use these constraints to make a enviornment of the function.Like this:
+
+			.type Symbol,@function
+			Symbol:
+
+				#	Arguments : Function use Stack to send parametes.(A,B,C...) (Order is A->B->C->...).
+				#	Return : Function save result in the EDX register.
+				#	Temporarly registers : EAX,EBX,ECX,EDX,EBP.
+
+				Env_Of_Symbol_:
+
+					pushq	%EBP		#	Save EBP
+					movq	%ESP,%EBP	#	Use EBP register as Stack accessing pointer.Indirectly accessing.
+					pushq	%EAX		#	Save EAX
+					pushq	%EBX		#	Save EB
+					pushq	%ECX		#	Save ECX
+				
+					#	EDX would save result.
+
+				Work_Symbol_Zone:
+
+					...
+					...
+
+				Return_Symbol_ZOne:
+
+					popq	%ECX	#	Restore the temporarly registers.
+					popq	%EBX
+					popq	%EAX
+					popq	%EBP
+	
+					ret	#	Return
+
+			And then,could call this function in main code : 
+
+				...		#	Push some parameters to stack.
+
+				call	Symbol	#	Call function.
+
+			Instructions
+
+			call	localtion	#	jump to a new localtion.(Shortly jump)
+			lcall	localtion	#	jump to a new localtion.(Long jump)
+
+			ret			#	Return.
+
+			
+			The works of 'call' instruction : 
+
+				push IP to stack
+				jump to new localtion
+
+			The works of 'ret' instruction : 
+
+				pop IP from stack. (old IP)
+
+		#	Using independent function files : 
+
+			Use independent file as function.o must declare the function-symbol as globally.
+			Like this : 
+
+			.type Func,@function
+			.global Func		#	Use the command,then other programs could seem this function-symbol.
+			Func:
+				...
+
+			After use 'ld' link this function.o object could make this function was called by other programs.
+
+		---
+	---
+---
+
+Assemly Command-Line Parameters : 
+
+		From shell to execule a process,linux must create a part of the virtual memory space for this process,and the virtual memory space would be 
+	mapping to the ahysics memory.For simply finishing this work,all process will got the virtual memory as same,linux use page/logic convertion work to
+	convert this virtual memory.
+		The virtual memory start on 0x80480000 end on 0xbfffffff.Like this : 
+
+		-----	0xbfffffff
+		Stack
+		-----
+
+
+		-----
+		Code/
+		Data
+		-----	0x80480000
+
+		When a process starting,linux put these messages in process space : 
+
+		1>	The number of command-line parameters.
+		2>	The process name finish from shell.
+		3>	The parameters from command-lins.
+		4>	The enviornment variables.
+
+		Then the process space like this :	(General layout) 
+
+		-----------	--->	Stack
+		Env-variable
+		-----------
+		Env-pointer
+		-----------
+		0x00000000
+		-----------
+		pointer->cmdL-parameter3
+		-----------
+		pointer->cmdL-parameter2
+		-----------
+		pointer->cmdL-parameter1
+		-----------
+		proc-Name
+		-----------
+		Arguments num
+		-----------	<---	ESP
+
+		-----------
+
+		Unmap		
+	
+		-----------
+		.data
+		-----------
+		.bss
+		-----------
+		.text
+		-----------
+
+		
+		So,could use stack to get command line parameters in the program.In the 32bit model,all of the command line parameters and the envs as same
+	size is 4B,but in 64bit model,they are 8B.	(32bit--4B/Unit,64bit--8B/Unit)
+
+		---
+	---
+---
+
+
+Assembly Library : 
+
+		The assembly-lib is that archiving some function-object-files as a library file.Static library : *.s,dynamic library : *.so.
+	
+		Files archiving like to C library building,but using assembly function in C program,must compling with some constraint : 
+
+		The registers'usage in C program : 
+
+		Registers			Status
+
+		EAX				Save the output value,but this value may be changed before function return.
+		EBX				Point to the global displacement table(Must retain it).
+		ECX				Could using in function.	# But in cycle part,this register was possible used. Becareful.
+		EDX				Could using in function.
+		EBP				This Register would used as the Stack'Base_Pointer(Must retain it).
+		ESP				Stack-TOP-Pointer.	
+						# Some function would changed this register make it point at the last argument or local variable.
+						# If not in that situation,inline ASM "push"/"pop" would be possible cause some error. Becareful.
+
+		EDI				As a local register in C program.
+		ESI				As a local register in C program.
+						# GCC propobly use them to send arguments to function.
+	
+		ST(0)				Save the output value which type is floating data,but this value may be changed before function return.
+		ST(1)~ST(7)			Could using in function.
+
+		//	This is 32bit model C program register usage,but on 64bit model,R8~R15 registers would be using(Pay a notice).
+
+		So,if you want to use assembly library in C program,must attend this constraint.At first determine the temporarly to be used registers,and 
+	then save the old values,before return restore them.
+
+		The C program sends parameters the order is right to left : _func_(a,b,c);
+			#	First push 'c' to stack.
+			#	Second push 'b' to stack.
+			#	Third push 'a' to stack.
+			#	.....
+
+			#	Then ESP->'a'.
+
+		Stack : 
+
+			----------
+			Other
+			----------
+			Parameter3	<-- 'c'
+			----------
+			Parameter2	<-- 'b'
+			----------
+			Parameter1	<-- 'a'
+			----------
+		ESP->	EIP		<-- By 'call'
+			----------
+
+
+		###
+
+
+		For a string to be returned : 
+			
+			#	Remember that use Assembly function to processing string operation,must as a '\0' as end in the C/C++ program.
+
+			In general situation,C program assume that the function return an integer value.But processing operation for string,must return a 
+		pointer.For indication that the assembly function return a pointer,must adding a function prototype over the 'main' function.
+			Like this : 
+
+			char* _Asm_Func_(void);
+
+			int main(void)
+			{
+				char* A=_Asm_Func_();
+				...
+			}
+
+			The function'definition in the assembly object,so have not to define this function in this C program.
+
+		###
+
+		For a floating data to be returned : 
+			
+			The C program use the ST(0)-Register for switching floating value between in the functions.Function put a float ing value in the FPU
+		Stack,and then return.The caller function pop that floating value up and assign it to a variable.
+
+			Of cause,return a floating value must declare the Function'Prototype before the 'main' function.
+
+			float _Asm_Func_(void);
+
+			int main(void)
+			{
+				float A=_Asm_Func_();
+				...
+			}
+
+			#	The floating data types have 'float' and 'double'.
+
+		###
+
+		For several kinds input parameters : 
+
+			For example : An assembly function _Func_,it receive two for input arguments.The first is a double,the second is a int.
+			
+			Stack : 
+
+				-------
+				Other
+				-------
+				int	<--	4Bytes
+				-------
+				double	<--	8Bytes
+				-------
+			ESP->	IP
+				-------
+
+			_Func_ use 16(%EBP) to read the 8Bytes double value,use 24(%EBP) to read the 4Bytes int.
+			If C program call this function as this style : 
+
+				double a=3.11;
+				int b=2;
+				_Func_(b,a);
+
+			And then,the 'b' is  a int value,it would be as the parameter1 put into the Stack._Func_ use 16(%EBP) to read a 8Byte data,but this 
+		is a error.
+
+				So must compling with the _Func_'rule to send parameters.Like this : 
+
+					_Func_(a,b);	//	-----	
+							//	b
+				This's right.		//	-----
+							//	a
+				Right to Left push.	//	-----
+							//	IP	<-- ESP
+							//	-----
+
+		###
+
+		For using Assembly functions in C++ : 
+
+			The default situation in C++,all function use the C++ 'Name and Call constraint' to translating.C++ function support to the overload,
+		but C function do not support to overload.If you want use Assembly Function in C++ must adding the part :
+
+			extern "C" {
+
+				Function-Prototypes
+				...
+			}
+
+			This part told to  the translater that these functions all are 'The C functions'.Then translater use the C method to translate these.
+
+		###
+
+		Create Assembly static library : 
+
+			Like C static library'create-method.Translated the Assembly-Function files to the object files.Then use 'ar' tool to archiving these 
+		files.
+			gcc use option '-Wl,-Basic -lxx' could link the 'xx' library with static method.'-static' option will prevent all dynamic linking,so
+		don't suggest that.Option '-static-libxx' could use static method to link some system library,but only support to the system libraries.
+
+		###
+
+		Create Assembly share library : 
+			
+			Like C share library'create-method.Use gcc'option '-share' to make a share libary.But before that must use the 'as' to translating 
+		the source files to object files.
+			Dynamic loader must had knew the share library path.Can use the two for methods to told it : 
+
+			1>	The environment variable : LD_LIBRARY_PATH.
+			2>	The ld.so.conf file.(After revised it,use command 'ldconf' to reload)
+
+		---
+	---
+---
+
+System Call :
+
+		All the system-call functions in the file '/usr/include/asm/unistd.h',the be supported calls all recorded in that file.
+	
+		The System call style : 
+
+			1>	System-Call number.
+			2>	System-Call input parameters.
+			3>	System-Call return value.
+			4>	The complex return value by System-Call.
+
+		System-Call Number>
+
+			Linux system use EAX register to save the System-Call-Number.The numbers were recorded in the '/usr/include/asm/unistd.h'
+
+		System-Call Input Parameters>
+
+			The general situation like this style :
+
+				EBX	<--	Parameter 1.
+				ECX	<--	Parameter 2.
+				EDX	<--	Parameter 3.
+				ESI	<--	Parameter 4.
+				EDI	<--	Parameter 5.
+
+			If the number of arguments greater than five,use the 'EBX' register to save a header pointer of the continuous memory unit.Input 
+		parameters would saved in the units with continuous method.System use this 'EBX' register to accessing these parameters.
+
+			System-Call-Functions'description could use 'man' pager to reading them.
+
+		System-Call Return Value>
+
+			The general situation value by system-call returned would saved in the EAX register.
+
+		The Complex Return Value By System-Call>
+
+			The complex return like 'return a struct' or 'return a class' or others.
+			Could return a pointer,and then caller as the struct definition to read data(C program).
+			In assembly program,coder could define a piece of memory to split it as a struct distribution.Define it in the '.data' section.
+
+			Like this : 
+				
+			.section .data
+			STRUCT_1:
+				.Member1:
+					.int 0			#	A int data.
+				.Member2:
+					.float 0		#	A floating data.
+				.Member3:
+					.ascii "00000000"	#	8Bytes array. char
+			##
+
+			Use 'STRUCT_1' as the struction'memory-block-symbol.
+			Use '.Member1' as the first member'memory-block-symbol.
+			Use '.Member2' as the second member'memory-block-symbol.
+			Use '.Member3' as the third member'memory-block-symbol.
+
+			If the System-Call return a struction,you must knew the struct definition at first.
+
+		---
+	---
+---
+
+Inline Assembly : 
+
+
+		GNU/GCC Inline Assembly Style :
+
+			asm("assembly code");		//	asm keywork to told translater there is a assembly code block.	
+
+		The registers'name must is below style,like this : eax,ebx,ecx,edx,... ; Error : EAX,EBX,ECX,EDX,... ;
+		(Only in *.c or *.cpp file)
+
+		The constraint : 
+	
+			#	Assembly code must be contained in the ".."
+			#	If assembly codes not one statement,must use newline 'character' to split them.('\n')
+			#	Could use Tab character to indentate it.
+
+		For example : 
+
+			asm("movl %EBX,%EAX\n\t"
+				"addl	%EAX,%ECX\n\t"
+				...
+			);
+
+		Assembly code block could put in the C/C++ Source file anywhere.
+
+		#	Using C global variable in assembly code block>
+
+			Attention : Can not using the local variable in the basic assembly code block !!!
+
+			For example :
+			
+			int a=12;
+			int b=13;
+
+			int main(void)
+			{
+				asm(
+					"movl	a,%EAX \n\t"		//	'a' is a global variable symbol
+					"movl	b,%EBX \n\t"		//	'b' also is a global variable symbol
+					"addl	%EBX,%EAX \n\t"
+				);
+			}
+
+			###
+
+		#	Tell to translater that don't optimization for assembly code block>
+
+			Use C/C++ modifier 'volatile',like this :
+
+				asm volatile (assembly code);
+
+			###
+
+		#	For C/C++ keyword 'asm'>
+		
+			The C/C++ is possible to use the 'asm' as other features.If at that situation,could use '__asm__' keyword to switching with 'asm'.
+
+			'__asm__' could be modified by '_volatile_' modifier.
+
+			###
+
+		#	Extra asm>
+
+			Because the extended 'asm' would supported to other features,so must use a new style to coding : 
+
+			asm("assmbly code" : output locations : input operands : changed registers);
+
+			1>	assembly code block : The normaly asm syntax assembly code.
+			2>	output locations : Contained Registers and Memory location list of Inline ASM'output.
+			3>	input operands : Contained Registers and Memory location list of Inline ASM'input.
+			4>	changed registers : List contained the was changed registers by Inline ASM. 
+	
+			#	Need not use all parts,but still use ':' as spliting.
+
+			#	The extended ASM could use the local variable or the global variable !!
+
+			!	Appoint the input value and the output value>
+
+				In the extended ASM could assign input-value and output-value from registers or memory location.
+
+				#	"constraint"(variable)
+
+				variabel -> The variable in the C/C++ code.
+				constraint -> Define that where the input to save or where the output to send.
+
+				constraint is some characters.
+
+				constraint TABLE :
+
+				constraint 				Description
+
+				a					Use %EAX or %AX or %AL
+				b					Use %EBX or %BX or %BL
+				c					Use %ECX or %CX or %CL
+				d					Use %EDX or %DX or %DL
+				S					Use %ESI or %SI
+				D					Use %EDI or %DI
+				r					Use anyone of the normaly registers
+				q					Use %EAX or %EBX or %ECX or %EDX
+				A					For 64bit data use %EAX and %EDX (Below and Hight)
+				f					Use float register
+				t					Use the float register which on the TOP	(The first)
+				u					Use the second float register
+				m					Use memory location of the variable
+				o					Use the displacement of memory location
+				V					Only use the directly memory location
+				i					Use immediatly integer
+				n					Use the immediatly integer which the value has been knew
+				g					Use anything of the memory location or the registers all are could be used.
+				
+				#	Output modifier,tell translater that how processing the output value.
+
+				+					Can I/O for operand
+				=					Only_Read for operand
+				%					If it is must,the operand could switching with the next operand
+				&					Before the ASM completed,can deleting or reusing for operand
+
+				Like this : 
+					asm("assembly code" : "=a"(result) : "d"(data1),"c"(data2));
+
+				And want to using register in the Extended ASM,must adding a '%' at the front :
+
+				int maint(void) 
+				{
+					int result=0;	//	Local variable,auto variable
+					int data1=1;
+					int data2=2;
+
+					asm("imull	%%EDX,%ECX\n\t"
+						"movl	%%ECX,%%EAX\n\t"
+						: "=a"(result)
+						: "d"(data1),"c"(data2));
+					
+						//	Using auto variable in the Extended ASM.
+					...	
+				}
+
+			###
+
+			!	Use Placeholder>
+
+				For the situation in several input or output values,Extended ASM provides 'Placeholder' be used in Inline ASM.
+
+				For example : 
+					
+				int main(void)
+				{
+					int result=0;
+					int data1=1;
+					int data2=2;
+
+					asm(
+						"imull	%1,%2\n\t"
+						"movl	%2,%0"
+						: "=r"(result)
+						: "r"(data1),"r"(data2));					
+					...
+				}
+		
+				#	Making the palceholders with order left to rigt 0,1,2,3,...
+
+				#	%0 -> result
+				#	%1 -> data1
+				#	%2 -> data2
+
+			###
+
+			!	Cite Placeholder>
+
+				If the Inline ASM,input and output use the same variable,can assign constraint value with a 'PlaceHolder'.
+
+				Like this : 
+
+				int main(void)
+				{
+					int data1=1;
+					int data2=2;
+					
+					asm(
+						"imull	%1,%0"
+						: "=r"(data2)			//	Output data2 <-- 0
+						: "r"(data1),"0"(data2));	//	Input data1 <-- 1
+					...
+				}
+
+				#	In this exampling,"0" tell translater that use the output register "r"0-->data2 as an input value register.
+
+			###
+
+			!	Switching Placeholder with a Name>
+
+				Syntax : %[name] "constraint"(variable)		//	Was supported over the version GNU/GCC 3.1
+
+				Like this : 
+
+				int main(void)
+				{
+					int data1=1;
+					int data2=2;
+				
+					asm(
+						"imull	%[Value1],%[Value2]"
+						: %[Value2] "r="(data2)
+						: %[Value1] "r"(data1),"0"(data2)):
+					...
+				}
+
+				Use the 'Value1' and the 'Value2' to switching placeholders.
+
+			###
+
+			!	Changed registers list>
+
+				This feature can only be using at the translater don't know that which register changed.
+				If Inline ASM used the input value registers and the output value registers they are not be initialized,must tell translater
+			that which registers would be changed.
+
+				Like this : 
+			
+				int main(void)
+				{
+
+					int data1=1;	
+					int data2=2;
+					int result=0;
+				
+					asm(
+						"movl	%1,%%EAX\n\t"
+						"addl	%%EAX,%0"		//	Use EAX as input register,but in input-part not have this register.
+						: "=r"(result)
+						: "r"(data1),"0"(result)
+						: "%EAX"			//	So there tell translater that the EAX changed.
+					);					//	Then assembler will prevent to use this EAX register.
+					...
+				}
+
+				Attention : 
+						If used anyone of memory address in Extended ASM and they were not defined in the I/O parts,it must be marked
+				to broken.Use "memory' to tell translater that the memory address had been changed in Inline ASM.
+		
+			###
+
+			!	Assembly macro>
+
+				The assembly macro like the C macro-function : 
+
+				#define KKSK(i,k,s) ((s)=(i)+(k))	//	C macro function
+
+				#define _KKSK_(result,data1,data2) ({\
+							asm(\
+								"movl	%1,%%EAX\n\t" \
+								"movl	%2,%%EDX\n\t" \
+								"addl	%1,%2\n\t" \
+								"movl	%2,%0\n\t" \
+								: "=r"(result) \		//	0-->result
+								: "r"(data1),"r"(data2) \	//	1-->data1,2-->data2
+							);\
+							})
+			###
+
+		---
+	---
+---
+
+File Operation In Assembly :
+
+		On the GNU/Linux,user application can not accessing the underlying device with directly.So must use System-Call to indirectly accessing them.
+	Example :
+			write();
+			read();
+			open();
+			close();
+			fstat();
+			...
+
+		---
+	---
+---
+
+Floating Operation : 
+
+		Floating style>
+
+			1>	Science and Technology Law.	(cocfficient/mantissa + exponent)
+			2>	Decimal.
+
+			1 : 3.14 * 10^5
+			2 : 3.141321
+
+			#	Binary Floating>
+
+				Use binary science method.All cocfficient and exponent will be changing to binary.
+
+				The general map :
+
+				binary			decimal fraction	decimal number
+
+				0.1			1/2			0.5
+				0.01			1/4			0.25
+				0.001			1/8			0.125
+				0.0001			1/16			0.0625
+				0.00001			1/32			0.03125
+				0.000001		1/64			0.015625
+
+				###
+
+				10.101			2+1/2+1/8		2.625
+				10011.001		19+1/8			19.125
+				10110.1101		22+1/2+1/4+1/16		22.8125
+				1101.011		13+1/4+1/8		13.375
+
+		IEEE Standard 754 floating>
+
+			A floating data would be spliting to three parts : 
+
+			1>	Symbol (Positive or Negative)
+			2>	Effected number
+			3>	Exponent
+
+			Saving method : 
+
+				|   |			|		|	
+				Symbol		Exponent	Cocfficient
+
+			Single presion : 32bit
+			Double presion : 64bit
+
+
+		FPU Instructions : 
+
+		Instruction			Description
+
+		fldX	source			Send a floating data from source to a FPU register
+		fstX	destination		Get the top data in the FPU register Stack
+
+		#	'X' : 's'->single presion ; 'l'->double presion.
+
+		#	Present FPU operations
+
+		FLD1				Push +1.0 to FPU Stack
+		FLDL2T				Push log2_10 to FPU Stack
+		FLDL2E				Push log2_e to FPU Stack
+		FLDPI				Push value of 'pi' to FPU Stack
+		FLDLG2				Push log10_2 to FPU Stack
+		FLDLN2				Push loge_2 to FPU Stack
+		FLDZ				Push +0.0 to FPU Stack
+
+
+		#	SSE Floating
+
+		MOVAPS				Send a packed data it contain four single-presion floatings with aligned to XMM register or memory
+		MOVUPS				Send a packed data it contain four single-presion floatings with not aligned to XMM register or memory
+		MOVSS				Send a single-presion floating to the memory or below double-words of register
+		MOVLPS				Send two single-presion floatings to the memory or the below four-words of register
+		MOVHPS				Send two single-presion floatings to the memory or the hight four-words of register
+		MOVLHPS				Send two single-presion floatings from the below four-words to the hight four-words
+		MOVHLPS				Send two single-presion floatings from the hight four-words to the below four-words
+
+		#	SSE2 Floating
+
+		MOVAPD				Send two double-presion floatings with aligned to XMM register or memory
+		MOVUPD				Send two double-presion floatings with not aligned to XMM register or memory
+		MOVSD				Send a double-presion floating to the memory or the below four-words of register
+		MOVHPD				Send two double-presion floating to the memory or the hight four-words of register
+		MOVLPD				Send two double-presion floating to the memory or the below four-words of register
+
+		---
+	---
+---
+
+---	
